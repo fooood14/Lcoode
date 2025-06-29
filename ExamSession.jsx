@@ -10,12 +10,31 @@ import RegistrationStep from '@/components/exam/RegistrationStep';
 import ExamStep from '@/components/exam/ExamStep';
 import CompletionStep from '@/components/exam/CompletionStep';
 
-const isCorrect = (userAnswers, correctAnswers) => {
-    if (!userAnswers || !correctAnswers) return false;
+// تحديث isCorrect لدعم الأسئلة المركبة
+const isCorrect = (userAnswers, correctAnswers, questionType) => {
+  if (!userAnswers || !correctAnswers) return false;
+
+  if (questionType === 'compound') {
+    // هنا كل واحد من correctAnswers هو مصفوفة فرعية
+    if (!Array.isArray(userAnswers) || !Array.isArray(correctAnswers)) return false;
+    if (userAnswers.length !== correctAnswers.length) return false;
+
+    return userAnswers.every((partAnswers, index) => {
+      const correctPartAnswers = correctAnswers[index];
+      if (!Array.isArray(partAnswers) || !Array.isArray(correctPartAnswers)) return false;
+      if (partAnswers.length !== correctPartAnswers.length) return false;
+
+      const sortedUser = [...partAnswers].sort();
+      const sortedCorrect = [...correctPartAnswers].sort();
+      return sortedUser.every((val, i) => val === sortedCorrect[i]);
+    });
+  } else {
+    // single أو multiple
     if (userAnswers.length !== correctAnswers.length) return false;
     const sortedUserAnswers = [...userAnswers].sort();
     const sortedCorrectAnswers = [...correctAnswers].sort();
     return sortedUserAnswers.every((val, index) => val === sortedCorrectAnswers[index]);
+  }
 };
 
 const ExamSession = () => {
@@ -73,7 +92,7 @@ const ExamSession = () => {
           question_type: q.question_type || 'single',
           video_url: null,
           time_limit_seconds: q.time_limit_seconds
-        })).sort((a,b) => (a.id || '').localeCompare(b.id || '')) 
+        })).sort((a,b) => (a.id || '').localeCompare(b.id || ''))
       };
       setExam(formattedExam);
       setTimeLeft(formattedExam.duration * 60);
@@ -94,7 +113,7 @@ const ExamSession = () => {
         setTimeLeft(prev => {
           if (prev <= 1) {
             clearInterval(timer);
-            submitExam(); 
+            submitExam();
             return 0;
           }
           return prev - 1;
@@ -130,7 +149,7 @@ const ExamSession = () => {
 
     const score = exam.questions.reduce((total, question) => {
         const userAnswersForQuestion = answers[question.id] || [];
-        return total + (isCorrect(userAnswersForQuestion, question.correct_answers) ? 1 : 0);
+        return total + (isCorrect(userAnswersForQuestion, question.correct_answers, question.question_type) ? 1 : 0);
     }, 0);
 
     const percentage = exam.questions.length > 0 ? Math.round((score / exam.questions.length) * 100) : 0;
